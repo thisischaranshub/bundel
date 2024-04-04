@@ -1,9 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: This CloudFormation Template is used to create the AppSync Api and CustomDomains
 Parameters: 
-  ResourceNamePrefix:
-    Type: String
-    Description: Enter the Prefix for the Resource.
   EnvironmentType:
     Description: Name your EnvironmentType According to your need.
     Type: String
