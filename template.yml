@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This CloudFormation Template is used to create the AppSync Api and CustomDomains
+Parameters: 
+  ResourceNamePrefix:
+    Type: String
+    Description: Enter the Prefix for the Resource.
+  EnvironmentType:
+    Description: Name your EnvironmentType According to your need.
+    Type: String
+  ServiceName:
+    Type: String
+    Description: Enter the Name of the service.
+  AppSyncAuthFunctionName:
+    Type: String
+    Description: Enter the Lambda functions Arn.
+  AppSyncDomain:
+    Type: String
+    Description: Enter the Domain Name.
+  AWSCertificateArn:
+    Type: String
+    Description: Enter the arn of the ACM Certificate
+Resources: 
+  GraphQLApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      AuthenticationType: AWS_LAMBDA
+      LogConfig: 
+        CloudWatchLogsRoleArn: !GetAtt AppSyncCWRole.Arn
+        ExcludeVerboseContent: True
+        FieldLogLevel: ALL
+      LambdaAuthorizerConfig:
+        AuthorizerResultTtlInSeconds: 300
+        AuthorizerUri: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppSyncAuthFunctionName}'
+      Name: !Sub '${ResourceNamePrefix}-${EnvironmentType}-${ServiceName}'
+      Tags: 
+      - Key: Name
+        Value: !Sub '${ResourceNamePrefix}-${EnvironmentType}-${ServiceName}-GrpQlApi'
+      - Key: ApplicationRole
+        Value: 'GrpQlApi'
+  AppSyncCustomDomainName:
+    Type: AWS::AppSync::DomainName
+    Properties:
+      CertificateArn: !Ref AWSCertificateArn
+      Description: Custom domain name using AWS Certification.
+      DomainName: !Ref AppSyncDomain
+  AppSyncDomainAssociation:
+    Type: AWS::AppSync::DomainNameApiAssociation
+    DependsOn:
+      - AppSyncCustomDomainName
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DomainName: !Ref AppSyncDomain
+  AppsyncPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AppSyncAuthFunctionName
+      Action: lambda:InvokeFunction
+      Principal: appsync.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt GraphQLApi.Arn
+  AppSyncCWRole:
+    Type: AWS::IAM::Role
+    Properties:
+        RoleName: !Sub '${ResourceNamePrefix}-${EnvironmentType}-${ServiceName}-CWRole'
+        Tags: 
+          - 
+            Key: Name
+            Value: !Sub '${ResourceNamePrefix}-${EnvironmentType}-${ServiceName}-CWRole'
+          -
+            Key: ApplicationRole
+            Value: !Sub '${ServiceName}-Build-Role'
+        AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action: 
+                  - 'sts:AssumeRole'
+                Effect: Allow
+                Principal:
+                  Service:
+                    - appsync.amazonaws.com
+        Path: /
+        Policies:
+            - PolicyName: !Sub '${ResourceNamePrefix}-${EnvironmentType}-${ServiceName}-CWPolicy'
+              PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - 'logs:CreateLogGroup'
+                      - 'logs:CreateLogStream'
+                      - 'logs:PutLogEvents'
+                    Resource: '*'
+
+Outputs:
+  AppSyncApiId:
+    Value: !GetAtt GraphQLApi.ApiId
+  AppSyncApiArn:
+    Value: !GetAtt GraphQLApi.Arn
+  AppSyncApiUrl:
+    Value: !GetAtt GraphQLApi.GraphQLUrl
